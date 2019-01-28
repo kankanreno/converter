@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"github.com/iancoleman/strcase"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/_jinzhu/inflection"
 )
 
 //map for converting mysql type to golang types
@@ -58,9 +60,10 @@ type Table2Struct struct {
 	config         *T2tConfig
 	err            error
 	realNameMethod string
-	enableJsonTag  bool   // 是否添加json的tag, 默认不添加
-	packageName    string // 生成struct的包名(默认为空的话, 则取名为: package model)
+	enableTagKey  bool   // 是否添加key的tag, 默认不添加
 	tagKey         string // tag字段的key值,默认是orm
+	enableTagJson  bool   // 是否添加json的tag, 默认不添加
+	packageName    string // 生成struct的包名(默认为空的话, 则取名为: package model)
 }
 
 type T2tConfig struct {
@@ -114,8 +117,8 @@ func (t *Table2Struct) Prefix(p string) *Table2Struct {
 	return t
 }
 
-func (t *Table2Struct) EnableJsonTag(p bool) *Table2Struct {
-	t.enableJsonTag = p
+func (t *Table2Struct) EnableTagJson(p bool) *Table2Struct {
+	t.enableTagJson = p
 	return t
 }
 
@@ -157,16 +160,18 @@ func (t *Table2Struct) Run() error {
 		if t.prefix != "" {
 			tableRealName = tableRealName[len(t.prefix):]
 		}
-		tableName := tableRealName
 
-		switch len(tableName) {
-		case 0:
-		case 1:
-			tableName = strings.ToUpper(tableName[0:1])
-		default:
-			// 字符长度大于1时
-			tableName = strings.ToUpper(tableName[0:1]) + tableName[1:]
-		}
+		// gen table name
+		tableName := inflection.Singular(strcase.ToCamel(tableRealName))
+		//switch len(tableName) {
+		//case 0:
+		//case 1:
+		//	tableName = strings.ToUpper(tableName[0:1])
+		//default:
+		//	// 字符长度大于1时
+		//	tableName = strings.ToUpper(tableName[0:1]) + tableName[1:]
+		//}
+
 		depth := 1
 		structContent += "type " + tableName + " struct {\n"
 		for _, v := range item {
@@ -276,6 +281,7 @@ func (t *Table2Struct) getColumns(table ...string) (tableColumns map[string][]co
 		col.ColumnComment = col.ColumnComment
 		col.ColumnName = t.camelCase(col.ColumnName)
 		col.Type = typeForMysqlToGo[col.Type]
+
 		// 字段首字母本身大写, 是否需要删除tag
 		if t.config.RmTagIfUcFirsted &&
 			col.ColumnName[0:1] == strings.ToUpper(col.ColumnName[0:1]) {
@@ -290,12 +296,19 @@ func (t *Table2Struct) getColumns(table ...string) (tableColumns map[string][]co
 			//} else {
 			//}
 		}
-		if t.enableJsonTag {
+
+		// TODO tag key & tag json
+		// tag key
+		if t.enableTagKey {
 			//col.Json = fmt.Sprintf("`json:\"%s\" %s:\"%s\"`", col.Json, t.config.TagKey, col.Json)
-			col.Tag = fmt.Sprintf("`%s:\"%s\" json:\"%s\"`", t.tagKey, col.Tag, col.Tag)
-		} else {
 			col.Tag = fmt.Sprintf("`%s:\"%s\"`", t.tagKey, col.Tag)
 		}
+
+		// tag json
+		if t.enableTagJson {
+			col.Tag = fmt.Sprintf("`json:\"%s\"`", col.Tag)
+		}
+
 		//columns = append(columns, col)
 		if _, ok := tableColumns[col.TableName]; !ok {
 			tableColumns[col.TableName] = []column{}

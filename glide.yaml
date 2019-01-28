@@ -1,0 +1,9 @@
+package: go-orm-converter
+import:
+- package: google.golang.org/appengine
+- package: github.com/go-sql-driver/mysql
+  version: ^1.4.1
+- package: github.com/gohouse/converter
+  version: ^0.0.3
+- package: github.com/iancoleman/strcase
+- package: github.com/jinzhu/inflection
